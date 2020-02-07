@@ -1,0 +1,157 @@
+﻿@page "/quiz"
+@using BlazorQuiz.Services
+@using BlazorQuiz.Models;
+@inject QuizService QuizService
+<h1>Quiz</h1>
+
+@if (categories == null)
+{
+    <p><em>Loading...</em></p>
+}
+@if (categories != null)
+{
+<div>
+    <label style="font-weight:bold;">Select a Category:</label>
+    <select title="Select a Category" @bind="selectedCategory">
+        @foreach (var category in categories.TriviaCategories)
+        {
+            <option value="@category.Id">
+                @category.Name.ToString()
+            </option>
+        }
+    </select>
+
+    @if (categoryData == null)
+    {
+        <p><em>@szLoadingText</em></p>
+    }
+
+    @if (categoryData != null)
+    {
+        <div>
+            <label style="font-weight:bold;">Select Questions: </label>
+            <label>
+                <input type="radio" name="edition" @onchange="@(async (e) => OnDifficultyChange("easy"))" />
+                Easy (@categoryData.CategoryQuestionCount.TotalEasyQuestionCount.ToString())
+            </label>
+            <label>
+                <input type="radio" name="edition" @onchange="@(async (e) => OnDifficultyChange("medium"))" /> Medium (@categoryData.CategoryQuestionCount.TotalMediumQuestionCount.ToString())
+            </label>
+            <label>
+                <input type="radio" name="edition" @onchange="@(async (e) => OnDifficultyChange("hard"))" /> Hard (@categoryData.CategoryQuestionCount.TotalHardQuestionCount.ToString())
+            </label>
+        </div>
+        <div style="display:@displayQuizFormat">
+            <label style="font-weight:bold;">Select a Quiz Format: </label>
+            <label>
+                <input type="radio" disabled name="questionType" @onchange="@(async (e) => await OnFormatChange("true"))" /> True/False
+            </label>
+            <label>
+                <input type="radio" name="questionType" @onchange="@(async (e) => await OnFormatChange("multiple"))" /> Multiple Choice
+            </label>
+        </div>
+        <br />
+    }
+    <label style="display:@displayQuestionsText"><em>Loading...</em></label>
+
+    @if (quizData != null)
+    {
+        var questionNumber = 1;
+        @foreach (var item in quizData.Results)
+        {
+            <p>
+                <div style="border-color:darkblue;border-style:solid;margin-left:5px;margin-right:5px;">
+                    <label style="font-weight:bold;margin-left:5px;">(@questionNumber.ToString())&nbsp; </label>
+                    <label style="text-decoration:underline;">@item.Question</label><br />
+                    <div style="margin-left:5px;margin-right:5px;">
+                        @for (var i = 0; i < item.IncorrectAnswers.Length; i++)
+                        {
+                            <label  style="margin-left:5px;">
+                                <input type="radio" name="@questionNumber" value="@item.IncorrectAnswers[i]" /> @item.IncorrectAnswers[i]
+                            </label>
+                        }
+                        <input  style="margin-left:5px;" type="radio" name="@questionNumber" /> @item.CorrectAnswer
+                        <br />
+                        <div class=""></div>
+                    </div>
+                </div>
+            </p>
+            questionNumber++;
+        }
+    }
+</div>
+}
+@code {
+    private int currentCount = 0;
+    private bool IsLoadedCategories = false;
+    private CategoryList categories;
+    private CategoryQuestions categoryData;
+    private QuizQuestions quizData;
+    private string szLoadingText = "";
+    private string _selectedCategory = "9";
+    private string selectedCategory
+    {
+        get
+        {
+            return _selectedCategory;
+        }
+        set
+        {
+            _selectedCategory = value;
+            categoryData = null;
+            quizData = null;
+            Task.FromResult(FetchQuestionData(value));
+        }
+    }
+    private string difficulty;
+    private string formatType;
+    private string displayQuizFormat = "none;";
+    private string displayGetQuizButton = "none;";
+    private string displayQuestionsText = "none;";
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await QuizService.GetAllCategoriesAsync();
+        IsLoadedCategories = true;
+
+        await Task.FromResult(FetchQuestionData(selectedCategory));
+    }
+
+    public async Task FetchQuestionData(string _selectedCategory)
+    {
+        displayQuizFormat = "none;";
+        szLoadingText = "Loading ...";
+        categoryData = null;
+
+        categoryData = await QuizService.GetQuestionsInCategoryAsync(_selectedCategory);
+        szLoadingText = "";
+        StateHasChanged();
+    }
+    public void OnDifficultyChange(string _difficulty)
+    {
+        displayQuizFormat = "inline;";
+        difficulty = _difficulty;
+        if (quizData != null)
+        {
+            quizData = null;
+            GetQuiz();
+        }
+
+    }
+    public async Task OnFormatChange(string _format)
+    {
+        formatType = _format;
+        if (_format != null)
+            await GetQuiz();
+
+        //displayGetQuizButton = "inline";
+    }
+    public async Task GetQuiz()
+    {
+        displayQuestionsText = "inline;";
+        quizData = await QuizService.GetQuestions(selectedCategory, difficulty, formatType);
+        displayQuestionsText = "none;";
+        StateHasChanged();
+    }
+}
