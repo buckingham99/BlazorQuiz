@@ -2,6 +2,8 @@
 @using BlazorQuiz.Services
 @using BlazorQuiz.Models;
 @inject QuizService QuizService
+@inject IJSRuntime JSRuntime
+
 <h1>Quiz</h1>
 
 @if (categories == null)
@@ -10,80 +12,92 @@
 }
 @if (categories != null)
 {
-<div>
-    <label style="font-weight:bold;">Select a Category:</label>
-    <select title="Select a Category" @bind="selectedCategory">
-        @foreach (var category in categories.TriviaCategories)
+    <div>
+        <label style="font-weight:bold;">Select a Category:</label>
+        <select title="Select a Category" @bind="selectedCategory">
+            @foreach (var category in categories.TriviaCategories)
+            {
+                <option value="@category.Id">
+                    @category.Name.ToString()
+                </option>
+            }
+        </select>
+
+        @if (categoryData == null)
         {
-            <option value="@category.Id">
-                @category.Name.ToString()
-            </option>
+            <p><em>@szLoadingText</em></p>
         }
-    </select>
 
-    @if (categoryData == null)
-    {
-        <p><em>@szLoadingText</em></p>
-    }
-
-    @if (categoryData != null)
-    {
-        <div>
-            <label style="font-weight:bold;">Select Questions: </label>
-            <label>
-                <input type="radio" name="edition" @onchange="@(async (e) => OnDifficultyChange("easy"))" />
-                Easy (@categoryData.CategoryQuestionCount.TotalEasyQuestionCount.ToString())
-            </label>
-            <label>
-                <input type="radio" name="edition" @onchange="@(async (e) => OnDifficultyChange("medium"))" /> Medium (@categoryData.CategoryQuestionCount.TotalMediumQuestionCount.ToString())
-            </label>
-            <label>
-                <input type="radio" name="edition" @onchange="@(async (e) => OnDifficultyChange("hard"))" /> Hard (@categoryData.CategoryQuestionCount.TotalHardQuestionCount.ToString())
-            </label>
-        </div>
-        <div style="display:@displayQuizFormat">
-            <label style="font-weight:bold;">Select a Quiz Format: </label>
-            <label>
-                <input type="radio" disabled name="questionType" @onchange="@(async (e) => await OnFormatChange("true"))" /> True/False
-            </label>
-            <label>
-                <input type="radio" name="questionType" @onchange="@(async (e) => await OnFormatChange("multiple"))" /> Multiple Choice
-            </label>
-        </div>
-        <br />
-    }
-    <label style="display:@displayQuestionsText"><em>Loading...</em></label>
-
-    @if (quizData != null)
-    {
-        var questionNumber = 1;
-        @foreach (var item in quizData.Results)
+        @if (categoryData != null)
         {
-            <p>
-                <div style="border-color:darkblue;border-style:solid;margin-left:5px;margin-right:5px;">
-                    <label style="font-weight:bold;margin-left:5px;">(@questionNumber.ToString())&nbsp; </label>
-                    <label style="text-decoration:underline;">@item.Question</label><br />
-                    <div style="margin-left:5px;margin-right:5px;">
-                        @for (var i = 0; i < item.IncorrectAnswers.Length; i++)
-                        {
-                            <label  style="margin-left:5px;">
-                                <input type="radio" name="@questionNumber" value="@item.IncorrectAnswers[i]" /> @item.IncorrectAnswers[i]
-                            </label>
-                        }
-                        <input  style="margin-left:5px;" type="radio" name="@questionNumber" /> @item.CorrectAnswer
-                        <br />
-                        <div class=""></div>
+            <div>
+                <label style="font-weight:bold;">Select Questions: </label>
+                <label>
+                    <input type="radio" name="edition" @onchange="@(async (e) => OnDifficultyChange("easy"))" />
+                    Easy (@categoryData.CategoryQuestionCount.TotalEasyQuestionCount.ToString())
+                </label>
+                <label>
+                    <input type="radio" name="edition" @onchange="@(async (e) => OnDifficultyChange("medium"))" /> Medium (@categoryData.CategoryQuestionCount.TotalMediumQuestionCount.ToString())
+                </label>
+                <label>
+                    <input type="radio" name="edition" @onchange="@(async (e) => OnDifficultyChange("hard"))" /> Hard (@categoryData.CategoryQuestionCount.TotalHardQuestionCount.ToString())
+                </label>
+            </div>
+            <div style="display:@displayQuizFormat">
+                <label style="font-weight:bold;">Select a Quiz Format: </label>
+                <label>
+                    <input type="radio" disabled name="questionType" @onchange="@(async (e) => await OnFormatChange("true"))" /> True/False
+                </label>
+                <label>
+                    <input type="radio" name="questionType" @onchange="@(async (e) => await OnFormatChange("multiple"))" /> Multiple Choice
+                </label>
+            </div>
+            <br />
+        }
+        <label style="display:@displayQuestionsText"><em>Loading...</em></label>
+
+        @if (quizData != null)
+        {
+            var questionNumber = 1;
+
+            @foreach (var item in quizData.Results)
+            {
+                var question = questionNumber;
+                <p>
+                    <div style="border-color:darkblue;border-style:solid;margin-left:5px;margin-right:5px;">
+                        <label style="font-weight:bold;margin-left:5px;">(@questionNumber.ToString())&nbsp; </label>
+                        <label style="background-color:cyan;font-weight:bold;">@item.Question</label><br />
+                        <div style="margin-left:5px;margin-right:5px;">
+                            @for (var i = 0; i < item.IncorrectAnswers.Length; i++)
+                            {
+                                var answer = "";
+                                answer = @item.IncorrectAnswers[i];
+                                var questionIdBad = "Answer_" + question.ToString();
+                            <span style="margin-left:5px;">
+                                <input type="radio" name="@questionNumber" value="@answer"
+                                       @onchange="@(async (e) => await CheckAnswer(question, answer,questionIdBad))" /> @answer
+                            </span>
+                            }
+                            @{ 
+
+                                var rightAnswer = @item.CorrectAnswer;
+                                var questionId = "Answer_" + question.ToString();
+                                        <input style="margin-left:5px;" type="radio" name="@questionNumber"
+                                               @onchange="@(async (e) => await CheckAnswer(question, rightAnswer,@questionId))" /> @rightAnswer
+
+                        <label id="@questionId" class="float-lg-right" style="border-color:blue;border:thin;font-weight:bold;"></label>
+                             }
+                            <br />
+
+                        </div>
                     </div>
-                </div>
-            </p>
-            questionNumber++;
+                </p>
+                questionNumber++;
+            }
         }
-    }
-</div>
+    </div>
 }
 @code {
-    private int currentCount = 0;
-    private bool IsLoadedCategories = false;
     private CategoryList categories;
     private CategoryQuestions categoryData;
     private QuizQuestions quizData;
@@ -106,14 +120,13 @@
     private string difficulty;
     private string formatType;
     private string displayQuizFormat = "none;";
-    private string displayGetQuizButton = "none;";
+    
     private string displayQuestionsText = "none;";
-
 
     protected override async Task OnInitializedAsync()
     {
         categories = await QuizService.GetAllCategoriesAsync();
-        IsLoadedCategories = true;
+        //IsLoadedCategories = true;
 
         await Task.FromResult(FetchQuestionData(selectedCategory));
     }
@@ -153,5 +166,21 @@
         quizData = await QuizService.GetQuestions(selectedCategory, difficulty, formatType);
         displayQuestionsText = "none;";
         StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task CheckAnswer(int _questionNumber, string answer, string answerId)
+    {
+        var tmp = quizData.Results[_questionNumber-1].CorrectAnswer;
+        if (tmp == answer)
+        {
+            var tmpAnswer = await JSRuntime.InvokeAsync<string>("window.FindElement", answerId, "Correct");
+        }
+        else
+        {
+            var tmpAnswer = await JSRuntime.InvokeAsync<string>("window.FindElement", answerId, "Incorrect");
+        }
+        
+
     }
 }
